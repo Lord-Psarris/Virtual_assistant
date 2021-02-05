@@ -10,7 +10,7 @@ import pyttsx3
 import http.client as hype
 
 
-appId = 'APER4E-58XJGHAVAK'  # get the wolfram alpha app id
+appId = ''  # get the wolfram alpha app id
 
 
 class Virtual:
