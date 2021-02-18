@@ -1,5 +1,9 @@
-# question to athena and answers have been added
+"""
+prompts before redirecting to google
+can open apps from the search menu
+"""
 
+# imports
 import speech_recognition as sr
 import wolframalpha
 import wikipedia
@@ -7,120 +11,188 @@ import requests
 import webbrowser
 import time
 import pyttsx3
-import http.client as hype
+import http.client as http
+import pyautogui
 
-
+# necessities
 appId = ''  # get the wolfram alpha app id
+client = wolframalpha.Client(appId)
+speaker = pyttsx3.init()
+voices = speaker.getProperty('voices')  # getting details of current voice
+speaker.setProperty('voice', voices[1].id)
+rate = speaker.getProperty('rate')  # getting details of current speaking rate: 200
+speaker.setProperty('rate', 170)  # setting up new voice rate
+speech = sr.Recognizer()
+
+print('checking connection...\n')
 
 
-class Virtual:
+def prompt(param):
+    print('we could not find an answer to your question \n do you want to be redirected to google?')
+    loop = True
+    while loop:
+        ask = input('y/n ')
+        if ask == 'Y' or ask == 'y':
+            print('you are being redirected')
+            time.sleep(3)
+            webbrowser.open(f'https://google.com/search?q={param}')
+            loop = False
+        elif ask == 'N' or ask == 'n':
+            print('okay')
+            loop = False
+            return None
+        else:
+            print('Wrong input')
+            continue
 
-    client = wolframalpha.Client(appId)
-    speaker = pyttsx3.init()
-    voices = speaker.getProperty('voices')  # getting details of current voice
-    speaker.setProperty('voice', voices[1].id)
-    rate = speaker.getProperty('rate')  # getting details of current speaking rate: 200
-    speaker.setProperty('rate', 160)  # setting up new voice rate
-    speech = sr.Recognizer()
+
+def search(param):
+    pyautogui.hotkey('win', 's')
+    pyautogui.typewrite(param, interval=0.5)
+    pyautogui.typewrite(['enter'])
+
+
+# main class
+class Main:
 
     def __init__(self):
-        self.result = ''
-        self.question = ''
         self.loop = True
 
-
         """main thing begins here"""
-        self.conn = hype.HTTPConnection("www.google.com", timeout=5)
+        self.connection = http.HTTPConnection("www.google.com", timeout=5)
         try:
-            self.conn.request("HEAD", "/")
-            self.conn.close()
-            print("say 'end' to quit...")
+            self.connection.request("HEAD", "/")
+            self.connection.close()
+            print("say 'end' to quit...;\nto open a file or application, say 'open <filename>';\n"
+                  "the listener only works for 5 seconds but it can be adjusted.")
             print('...')
             while self.loop:
                 try:
+                    print('listening...')
                     with sr.Microphone() as source:
-                        print('listening...')
-                        Virtual.speech.adjust_for_ambient_noise(source)
-                        audio = Virtual.speech.listen(source)
-                        self.co = Virtual.speech.recognize_google(audio)
-                        print(self.co)
-                        if self.co == 'end':
+                        speech.adjust_for_ambient_noise(source)
+                        audio = speech.listen(source)
+                        command = speech.recognize_google(audio)
+                        print(command)
+                        haystack = command
+                        count = haystack.find('open')
+                        if command == 'end':
                             self.loop = False
                             print('process has been ended')
+                        elif count == 0:
+                            param = command.replace('open ', '')
+                            search(param)
+                            print(f'opening {param}')
+                            Play(f'opening {param}').__()
+                            time.sleep(3)
                         else:
-                            self.search(self.co)
-                except:
-                    print('didn\'t catch that, could you come again?')
-        except:
-            print('there is no internet connection')
-            self.conn.close()
+                            print('processing...')
+                            answer = Personalised(command)
+                            answer = answer.__()
+                            if answer is None:
+                                answer = Wolfram(command).__()
+                                if answer is None:
+                                    wiki = Wiki(command).__()
+                                    if wiki is None:
+                                        continue
+                                    else:
+                                        print(wiki)
+                                        Play(wiki).__()
 
-    def wolfram_search(self, variable):
-        res = Virtual.client.query(variable)
+                                        print('inna')
+                                else:
+                                    print(answer)
+                                    Play(answer).__()
+                                    image = Image(command).__()
+                                    if image is None:
+                                        pass
+                                    else:
+                                        print(image)
+                            else:
+                                print(answer)
+                                Play(answer).__()
+
+                                # restart question
+                        print('do you wanna go again? ')
+                        loop = True
+                        while loop:
+                            question = input('y/n ')
+                            if question == 'Y' or question == 'y':
+                                loop = False
+                                continue
+                            elif question == 'N' or question == 'n':
+                                print('thank you for your time')
+                                loop = False
+                                self.loop = False
+                            else:
+                                print('Wrong input')
+                                continue
+                except Exception as e:
+                    if e:
+                        print('didn\'t catch that, could you come again?, or the problem was ' + str(e))
+                        time.sleep(1)
+                    else:
+                        print('didnt catch that... come again')
+        except Exception as e:
+            print('there is no internet connection, or ' + str(e))
+            self.connection.close()
+
+
+# other classes
+class Wiki:
+
+    def __init__(self, variable):
+        self.variable = variable
+
+    def __(self):
+
+        results = wikipedia.search(self.variable)
+        # If there is no result, print no result
+        if not results:
+            prompt(self.variable)
+        try:
+            page = wikipedia.page(results[0])
+        except (wikipedia.DisambiguationError, error):
+            page = wikipedia.page(error.options[0])
+
+        wiki = str(page.summary)
+        return wiki
+
+
+class Wolfram:
+
+    def __init__(self, variable):
+        self.variable = variable
+
+    def __(self):
+        res = client.query(self.variable)
         if res['@success'] == 'false':
-            print('Question cannot be resolved... you are being redirected to google')
-            time.sleep(5)
-            webbrowser.open(f'http://google.com/search?q={variable}')  # Go to google.com
+            prompt(self.variable)
         else:
             # pod[0] is the question
-            pod0 = res['pod'][0]
+            # pod0 = res['pod'][0]
             # pod[1] may contain the answer
             pod1 = res['pod'][1]
             if (('definition' in pod1['@title'].lower()) or ('result' in pod1['@title'].lower()) or (
                     pod1.get('@primary', 'false') == 'true')):
                 # extracting result from pod1
-                result = self.fix_list(pod1['subpod'])
-                self.play_n_print(result)
-                question = self.fix_list(pod0['subpod'])
-                question = self.remove_brackets(question)
-                # self.primaryImage(question)
+                result = FixQuestion(pod1['subpod'])
+                return result.fix()
             else:
-                # extracting wolfram question interpretation from pod0
-                question = self.fix_list(pod0['subpod'])
-                # removing unnecessary parenthesis
-                question = self.remove_brackets(question)
-                # searching for response from wikipedia
-                self.wikipedia_search(question)
-                # self.primaryImage(question)
+                return None
 
-    def wikipedia_search(self, variable):
-        # running the query
-        search_results = wikipedia.search(variable)
-        # If there is no result, print no result
-        if not search_results:
-            print("No result from Wikipedia... you are being redirected to google")
-            time.sleep(5)
-            webbrowser.open(f'http://google.com/search?q={variable}')  # Go to google.com
-        # Search for page... try block
-        try:
-            page = wikipedia.page(search_results[0])
-        except (wikipedia.DisambiguationError, error):
-            page = wikipedia.page(error.options[0])
 
-        wiki_title = str(page.title.encode('utf-8'))
-        # wiki_summary = str(page.summary.encode('utf-8'))
-        # print(wiki_summary)
-        wiki_2 = str(page.summary)
-        self.play_n_print(wiki_2)
+class Image:
 
-    def remove_brackets(self, variable):
-        return variable.split('(')[0]
+    def __init__(self, variable):
+        self.variable = variable
 
-    def fix_list(self, variable):
-        if isinstance(variable, list):
-            return variable[0]['plaintext']
-        else:
-            return variable['plaintext']
-
-    def play_sound(self, variable):
-        Virtual.speaker.say(variable)
-        Virtual.speaker.runAndWait()
-        Virtual.speaker.stop()
-
-    def primaryImage(self, variable):
+    def __(self):
         url = 'http://en.wikipedia.org/w/api.php'
-        data = {'action': 'query', 'prop': 'pageimages', 'format': 'json', 'piprop': 'original', 'titles': variable}
+        data = {'action': 'query', 'prop': 'pageimages', 'format': 'json', 'piprop': 'original',
+                'titles': self.variable}
         try:
+            keys = ''
             res = requests.get(url, params=data)
             key = res.json()['query']['pages'].keys()
             for i in key:
@@ -128,38 +200,59 @@ class Virtual:
             if keys == "-1":
                 pass
             else:
-                imageUrl = res.json()['query']['pages'][keys]['original']['source']
-                print(imageUrl)
-        except:
-            print('there was an exception processing the image')
+                image_url = res.json()['query']['pages'][keys]['original']['source']
+                return image_url
+        except Exception as e:
+            print('there was an exception processing the image ' + str(e))
 
-    def play_n_print(self, variable):
-        statement_1 = variable
-        print(statement_1)
-        self.play_sound(statement_1)
 
-    def search(self, variable):
-        if variable == "what is your name":
-            self.play_n_print('My name is Athena, thanks for asking.')
-        elif variable == "what would you like to call yourself":
-            self.play_n_print('I would like to be called "The greatest dopest finest virtual beauty there is" but'
-                              ' Lord psarris says its too much')
-        elif variable == "when were you created":
-            self.play_n_print('I have no idea. You can ask Lord psarris about that.')
-        elif variable == "who is lord psarris":
-            self.play_n_print('Lord is my creator, he\'s a really awesome guy')
-        elif variable == "who is jesus":
-            self.play_n_print('Jesus is the Son of God, who died to redeem us from the curse of the law.')
-        elif variable == "thank you":
-            self.play_n_print('you are welcome.')
-            self.loop = False
-        elif variable == "thank you that will be all":
-            self.play_n_print('you are welcome.')
-            self.loop = False
+class Personalised:
+
+    def __init__(self, variable):
+        self.variable = variable
+
+    def __(self):
+        if self.variable == "what is your name":
+            return 'My name is Athena, thanks for asking.'
+        elif self.variable == "what would you like to call yourself":
+            return 'I would like to be called "The greatest dopest finest virtual beauty there is" but' \
+                   ' Lord psarris says its too much'
+        elif self.variable == "when were you created":
+            return 'I have no idea. You can ask Lord psarris about that.'
+        elif self.variable == "who is lord psarris":
+            return 'Lord is my creator, he\'s a really awesome guy'
+        elif self.variable == "who is jesus":
+            return 'Jesus is the Son of God, who died to redeem us from the curse of the law.'
         else:
-            self.wolfram_search(variable)
+            return None
 
+
+# helper classes
+class FixQuestion:
+
+    def __init__(self, question):
+        self.question = question
+
+    def fix(self):
+        if isinstance(self.question, list):
+            return self.question[0]['plaintext']
+        else:
+            return self.question['plaintext']
+
+    def fix_(self):
+        tried = self.question.split('(')[0]
+        return tried
+
+
+class Play:
+    def __init__(self, variable):
+        self.variable = variable
+
+    def __(self):
+        speaker.say(self.variable)
+        speaker.runAndWait()
+        speaker.stop()
 
 
 if __name__ == "__main__":
-    Virtual()
+    Main()
